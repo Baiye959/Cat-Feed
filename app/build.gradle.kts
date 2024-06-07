@@ -62,6 +62,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-common:19.0.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
@@ -74,4 +75,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.0.0-beta01")
     implementation("androidx.media3:media3-ui:1.0.0-beta01")
     implementation("androidx.media3:media3-exoplayer-hls:1.0.0-beta01")
+    // GET
+    implementation("com.squareup.okhttp3:okhttp:4.9.1")
 }
