@@ -6,17 +6,24 @@ import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,8 +45,11 @@ import java.io.IOException
 import org.json.JSONObject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+//import java.time.format.TextStyle
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +79,7 @@ fun LiveStreamScreen() {
         ExoPlayer.Builder(context).build().apply {
             val dataSourceFactory = DefaultHttpDataSource.Factory()
             val hlsMediaSource: MediaSource = HlsMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri("https://d1--cn-gotcha204.bilivideo.com/live-bvc/560341/live_4505367_8136424_2500/index.m3u8"))
+                .createMediaSource(MediaItem.fromUri("https://cn-fjfz-fx-01-05.bilivideo.com/live-bvc/257543/live_4505367_8136424/index.m3u8"))
             setMediaSource(hlsMediaSource)
             prepare()
             playWhenReady = true
@@ -84,25 +94,32 @@ fun LiveStreamScreen() {
 
 
     var remainHeight by remember { mutableStateOf( "hello") }
+//    var imageResource by remember {
+//        mutableStateOf(R.drawable.bottle_high)
+//    }
+    var imageResource = when (remainHeight) {
+        "0","1","2","3","4","5","6","7","8","9","10" -> R.drawable.bottle_low
+        "11","12","13","14","15","16","17","18","19","20" -> R.drawable.bottle_middle
+        else -> R.drawable.bottle_high
+    }
 
     // 定时更新remainHeight
     LaunchedEffect(Unit) {
         while (true) {
             remainHeight = simpleGetUse()
-            delay(1000) // 每隔1秒执行一次
+            delay(3000) // 每隔3秒执行一次
         }
     }
 
     // 页面绘制
-    val image = painterResource(R.drawable.bg)
-    Image(
-        painter = image,
-        contentDescription = null,
-        contentScale = ContentScale.Crop
+    // 自定义字体
+    val customFontFamily = FontFamily(
+        Font(resId = R.font.ubuntu, weight = FontWeight.Normal)
     )
+
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
         AndroidView(factory = {
             PlayerView(context).apply {
@@ -111,17 +128,65 @@ fun LiveStreamScreen() {
         },
             modifier = Modifier
                 .size(400.dp, 250.dp)
-                .padding(10.dp)
+                .padding(bottom = 10.dp)
         )
 
         Text(
-            text = remainHeight,
-            fontSize = 30.sp,
-            lineHeight = 30.sp,
+            text = "Cat Feed",
+            fontSize = 50.sp,
+            lineHeight = 50.sp,
+            fontWeight = FontWeight.Bold,
+            style = TextStyle(fontFamily = customFontFamily),
             modifier = Modifier
-                .padding(20.dp, 10.dp)
-                .align(alignment = Alignment.End)
+                .align(alignment = CenterHorizontally)
+                .padding(bottom = 10.dp)
         )
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(30.dp, Alignment.CenterHorizontally),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 10.dp)
+        ) {
+            Button(
+                onClick = { /*TODO*/ },
+                colors = ButtonDefaults.buttonColors(Color(0xFF6BB9E6)),
+                modifier = Modifier
+                    .weight(1f)
+//                    .height(50.dp)
+            ) {
+                Text("按钮1")
+            }
+            Button(
+                onClick = { /*TODO*/ },
+                colors = ButtonDefaults.buttonColors(Color(0xFFF8B551)),
+                modifier = Modifier
+                    .weight(1f)
+//                    .height(50.dp)
+            ) {
+                Text("按钮2")
+            }
+        }
+
+        Box(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Image(
+                painter = painterResource(imageResource),
+                contentDescription = remainHeight,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = remainHeight,
+                fontSize = 40.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(alignment = Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+            )
+        }
     }
 }
 
@@ -169,6 +234,6 @@ private fun simpleDealData(response: Response): String {
         .getInt("value")
 
     return StringBuilder().apply {
-        append("value: $value")
+        append("$value")
     }.toString()
 }
