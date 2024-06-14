@@ -80,6 +80,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.9.1")
     // Notification
     implementation("androidx.compose.material:material:1.1.1")
-    // rtmp
-//    implementation("androidx.media3:media3-exoplayer-rtmp:1.0.0")
+    // WorkManager dependency
+    implementation("androidx.work:work-runtime-ktx:2.7.1")
 }

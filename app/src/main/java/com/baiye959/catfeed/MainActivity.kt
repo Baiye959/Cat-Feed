@@ -33,9 +33,7 @@ import com.baiye959.catfeed.ui.theme.CatFeedTheme
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
-//import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
-//import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.ui.PlayerView
 import okhttp3.Call
@@ -64,6 +62,19 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.datasource.rtmp.RtmpDataSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.baiye959.catfeed.workers.NotificationWorker
+import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
+
 
 class MainActivity : ComponentActivity() {
     private lateinit var exoPlayer: ExoPlayer
@@ -76,8 +87,9 @@ class MainActivity : ComponentActivity() {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
+//                    color = MaterialTheme.colorScheme.background
+                    color = Color(0xFF8cedfe)
+                    ) {
                     LiveStreamScreen(exoPlayer)
                 }
             }
@@ -93,6 +105,7 @@ class MainActivity : ComponentActivity() {
             playWhenReady = true
         }
 
+        // 初始化通知渠道
         createNotificationChannel()
     }
 
@@ -133,28 +146,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(UnstableApi::class) @Composable
 fun LiveStreamScreen(exoPlayer: ExoPlayer) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    // 拉取直播流
-//    val exoPlayer = remember {
-//        ExoPlayer.Builder(context).build().apply {
-//            val dataSourceFactory = DefaultHttpDataSource.Factory()
-//            val hlsMediaSource: MediaSource = HlsMediaSource.Factory(dataSourceFactory)
-//                .createMediaSource(MediaItem.fromUri("https://cn-fjfz-fx-01-05.bilivideo.com/live-bvc/257543/live_4505367_8136424/index.m3u8"))
-//            setMediaSource(hlsMediaSource)
-//            prepare()
-//            playWhenReady = true
-//        }
-//    }
-//    val exoPlayer = remember {
-//        ExoPlayer.Builder(context).build().apply {
-//            val dataSourceFactory = RtmpDataSource.Factory()
-//            val rtmpMediaSource: MediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-//                .createMediaSource(MediaItem.fromUri("rtmp://10.26.44.75:1935/live/test"))
-//            setMediaSource(rtmpMediaSource)
-//            prepare()
-//            playWhenReady = true
-//        }
-//    }
     // 应用结束时释放exoPlayer资源
     DisposableEffect(
         key1 = exoPlayer
@@ -217,28 +210,19 @@ fun LiveStreamScreen(exoPlayer: ExoPlayer) {
         ) {
             Button(
                 onClick = {
-                    sendNotification(
-                        context = context,
-                        title = "Hello world!",
-                        content = "This is a notification"
-                    )
+                    scope.launch {
+                        sendNotification2(context = context)
+                    }
                 },
-                colors = ButtonDefaults.buttonColors(Color(0xFF6BB9E6)),
+                colors = ButtonDefaults.buttonColors(Color(0xFFffdc64)),
                 modifier = Modifier
                     .weight(1f)
-//                    .height(50.dp)
             ) {
-                Text("发送通知")
+                Text("设置", color = Color.Black)
             }
-            Button(
-                onClick = { /*TODO*/ },
-                colors = ButtonDefaults.buttonColors(Color(0xFFF8B551)),
-                modifier = Modifier
-                    .weight(1f)
-//                    .height(50.dp)
-            ) {
-                Text("按钮2")
-            }
+
+            // 添加 Switch 组件
+            NotificationSwitch()
         }
 
         Box(
@@ -294,6 +278,77 @@ suspend fun simpleGetUse(): String {
     }
 }
 
+
+@Composable
+fun NotificationSwitch() {
+    val context = LocalContext.current
+    var isNotificationEnabled by remember { mutableStateOf(false) }
+
+    // 加载开关状态
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        isNotificationEnabled = prefs.getBoolean("notification_enabled", false)
+        if (isNotificationEnabled) {
+            scheduleNotificationWorker(context)
+        }
+    }
+
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(0.4f),
+        horizontalAlignment = CenterHorizontally
+    ) {
+        // 保存开关状态并启动或取消定期任务
+        Switch(
+            checked = isNotificationEnabled,
+            onCheckedChange = { isChecked ->
+                isNotificationEnabled = isChecked
+                val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                with(prefs.edit()) {
+                    putBoolean("notification_enabled", isChecked)
+                    apply()
+                }
+                if (isChecked) {
+                    scheduleNotificationWorker(context)
+                } else {
+                    cancelNotificationWorker(context)
+                }
+            },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Color(0xFF6650A4),
+                checkedThumbColor = Color(0xFFFFFFFF),
+                uncheckedTrackColor = Color(0xFFE7E0EC),
+                uncheckedThumbColor = Color(0xFF6650A4)
+            )
+        )
+        Text("启动通知")
+    }
+}
+
+fun scheduleNotificationWorker(context: Context) {
+    // 每30分钟检查一次猫粮是否充足
+    val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(30, TimeUnit.MINUTES)
+        .setConstraints(
+            Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+        )
+        .build()
+
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        "NotificationWorker",
+        ExistingPeriodicWorkPolicy.REPLACE,
+        workRequest
+    )
+}
+
+fun cancelNotificationWorker(context: Context) {
+    WorkManager.getInstance(context).cancelUniqueWork("NotificationWorker")
+}
+
+
+
 //该函数用于简单处理返回的信息
 private fun simpleDealData(response: Response): String {
     val responseBody = response.body?.string() ?: return "No response body"
@@ -333,14 +388,6 @@ fun sendNotification(context: Context, title: String, content: String) {
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-            println("没有权限")
             ActivityCompat.requestPermissions(
                 context as Activity,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -349,5 +396,17 @@ fun sendNotification(context: Context, title: String, content: String) {
             return
         }
         notify(1, builder.build())
+    }
+}
+
+
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+suspend fun sendNotification2(context: Context) {
+    val remainHeight = withContext(Dispatchers.IO) {
+        simpleGetUse().toInt()
+    }
+    if (remainHeight <= 10) {
+        sendNotification(context, "猫粮剩余量不足！", "猫粮所剩不多！请您及时补充！")
     }
 }
