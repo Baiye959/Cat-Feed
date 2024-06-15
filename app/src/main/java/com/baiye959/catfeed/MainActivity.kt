@@ -56,6 +56,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Patterns
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -87,6 +89,28 @@ class MainActivity : ComponentActivity() {
     @OptIn(UnstableApi::class) @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 初始化默认值
+        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+//        prefs.edit()
+//            .putString("rtmp_url", "rtmp://10.26.44.75:1935/live/test")
+//            .putString("onenet_api_url", "https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")
+//            .putString("onenet_api_token", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")
+//            .apply()
+        if (!prefs.contains("rtmp_url")) {
+            prefs.edit()
+                .putString("rtmp_url", "rtmp://10.26.44.75:1935/live/test")
+                .apply()
+        }
+        if (!prefs.contains("onenet_api_url")) {
+            prefs.edit()
+                .putString("onenet_api_url", "https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")
+                .apply()
+        }
+        if (!prefs.contains("onenet_api_token")) {
+            prefs.edit()
+                .putString("onenet_api_token", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")
+                .apply()
+        }
         setContent {
             CatFeedTheme {
                 // A surface container using the 'background' color from the theme
@@ -101,7 +125,6 @@ class MainActivity : ComponentActivity() {
         }
 
         // Initialize ExoPlayer
-        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
         val rtmpUrl = prefs.getString("rtmp_url", "rtmp://165.154.221.62:1935/live/test")!!
         exoPlayer = ExoPlayer.Builder(this).build().apply {
             val dataSourceFactory = RtmpDataSource.Factory()
@@ -235,9 +258,15 @@ fun LiveStreamScreen(exoPlayer: ExoPlayer) {
                     onConfirm = { newValues ->
                         val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
                         with(prefs.edit()) {
-                            putString("rtmp_url", newValues[0])
-                            putString("onenet_api_url", newValues[1])
-                            putString("onenet_api_token", newValues[2])
+                            if (newValues[0].isNotBlank()) {
+                                putString("rtmp_url", newValues[0])
+                            }
+                            if (newValues[1].isNotBlank()) {
+                                putString("onenet_api_url", newValues[1])
+                            }
+                            if (newValues[2].isNotBlank()) {
+                                putString("onenet_api_token", newValues[2])
+                            }
                             apply()
                         }
                         showDialog = false
@@ -366,7 +395,19 @@ fun SettingsDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onConfirm(listOf(textFieldValue1, textFieldValue2, textFieldValue3))
+                    // 检查填写的值是否符合格式
+                    val isRtmpUrlValid = textFieldValue1.isBlank() || Patterns.WEB_URL.matcher(textFieldValue1).matches()
+                    val isApiUrlValid = textFieldValue2.isBlank() || Patterns.WEB_URL.matcher(textFieldValue2).matches()
+                    val isApiTokenValid = textFieldValue3.isBlank() || textFieldValue3.isNotBlank()
+
+                    if (textFieldValue1.isBlank() && textFieldValue2.isBlank() && textFieldValue3.isBlank()){
+                        Toast.makeText(context, "未修改", Toast.LENGTH_SHORT).show()
+                    } else if (isRtmpUrlValid && isApiUrlValid && isApiTokenValid) {
+                        onConfirm(listOf(textFieldValue1, textFieldValue2, textFieldValue3))
+                    } else {
+                        // 提示用户输入无效
+                        Toast.makeText(context, "输入格式错误", Toast.LENGTH_SHORT).show()
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(Color(0xFF997cce))
             ) {
