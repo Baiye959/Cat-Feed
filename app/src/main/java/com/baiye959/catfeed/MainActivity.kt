@@ -92,13 +92,13 @@ class MainActivity : ComponentActivity() {
         // 初始化默认值
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
 //        prefs.edit()
-//            .putString("rtmp_url", "rtmp://10.26.44.75:1935/live/test")
+//            .putString("rtmp_url", "rtmp://165.154.221.62:1935/live/test")
 //            .putString("onenet_api_url", "https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")
 //            .putString("onenet_api_token", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")
 //            .apply()
         if (!prefs.contains("rtmp_url")) {
             prefs.edit()
-                .putString("rtmp_url", "rtmp://10.26.44.75:1935/live/test")
+                .putString("rtmp_url", "rtmp://165.154.221.62:1935/live/test")
                 .apply()
         }
         if (!prefs.contains("onenet_api_url")) {
