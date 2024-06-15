@@ -52,13 +52,17 @@ class NotificationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, p
         return Result.success()
     }
     // 异步网络请求
-    suspend fun simpleGetUse(): String {
+    suspend fun simpleGetUse(context: Context): String {
+        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val apiUrl = prefs.getString("onenet_api_url", "https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")!!
+        val apiToken = prefs.getString("onenet_api_token", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")!!
+
         return suspendCancellableCoroutine { continuation ->
             val tag = "simpleGetUse"
             val okHttpClient = OkHttpClient()
             val requestBuilder = Request.Builder()
-                .url("https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")
-                .addHeader("Authorization", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")
+                .url(apiUrl)
+                .addHeader("Authorization", apiToken)
 
             okHttpClient.newCall(requestBuilder.build()).enqueue(object : Callback {
                 @OptIn(UnstableApi::class) override fun onFailure(call: Call, e: IOException) {
@@ -137,7 +141,7 @@ class NotificationWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, p
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     suspend fun sendNotification2(context: Context) {
         val remainHeight = withContext(Dispatchers.IO) {
-            simpleGetUse().toInt()
+            simpleGetUse(context).toInt()
         }
         if (remainHeight <= 10) {
             val remainPercent = (remainHeight / 30.0 * 100).toInt()

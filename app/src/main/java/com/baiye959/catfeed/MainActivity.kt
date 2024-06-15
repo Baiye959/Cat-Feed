@@ -57,6 +57,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -66,12 +69,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.window.DialogProperties
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.baiye959.catfeed.workers.NotificationWorker
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -96,10 +101,12 @@ class MainActivity : ComponentActivity() {
         }
 
         // Initialize ExoPlayer
+        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val rtmpUrl = prefs.getString("rtmp_url", "rtmp://165.154.221.62:1935/live/test")!!
         exoPlayer = ExoPlayer.Builder(this).build().apply {
             val dataSourceFactory = RtmpDataSource.Factory()
             val rtmpMediaSource: MediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri("rtmp://10.26.44.75:1935/live/test"))
+                .createMediaSource(MediaItem.fromUri(rtmpUrl))
             setMediaSource(rtmpMediaSource)
             prepare()
             playWhenReady = true
@@ -147,6 +154,7 @@ class MainActivity : ComponentActivity() {
 fun LiveStreamScreen(exoPlayer: ExoPlayer) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showDialog by remember { mutableStateOf(false) }
 
     // 应用结束时释放exoPlayer资源
     DisposableEffect(
@@ -166,7 +174,7 @@ fun LiveStreamScreen(exoPlayer: ExoPlayer) {
     // 定时更新remainHeight
     LaunchedEffect(Unit) {
         while (true) {
-            remainHeight = simpleGetUse()
+            remainHeight = simpleGetUse(context)
             delay(3000) // 每隔3秒执行一次
         }
     }
@@ -210,19 +218,35 @@ fun LiveStreamScreen(exoPlayer: ExoPlayer) {
         ) {
             Button(
                 onClick = {
-                    scope.launch {
-                        sendNotification2(context = context)
-                    }
+                    showDialog = true
                 },
-                colors = ButtonDefaults.buttonColors(Color(0xFFffdc64)),
+                colors = ButtonDefaults.buttonColors(Color(0xFF997cce)),
                 modifier = Modifier
                     .weight(1f)
             ) {
-                Text("设置", color = Color.Black)
+                Text("设置", color = Color.White)
+            }
+
+            if (showDialog) {
+                SettingsDialog(
+                    context = context,
+                    scope = scope,
+                    onDismiss = { showDialog = false },
+                    onConfirm = { newValues ->
+                        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                        with(prefs.edit()) {
+                            putString("rtmp_url", newValues[0])
+                            putString("onenet_api_url", newValues[1])
+                            putString("onenet_api_token", newValues[2])
+                            apply()
+                        }
+                        showDialog = false
+                    }
+                )
             }
 
             // 添加 Switch 组件
-            NotificationSwitch()
+            NotificationSwitch(context)
         }
 
         Box(
@@ -248,13 +272,17 @@ fun LiveStreamScreen(exoPlayer: ExoPlayer) {
 }
 
 // 异步网络请求
-suspend fun simpleGetUse(): String {
+suspend fun simpleGetUse(context: Context): String {
+    val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+    val apiUrl = prefs.getString("onenet_api_url", "https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")!!
+    val apiToken = prefs.getString("onenet_api_token", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")!!
+
     return suspendCancellableCoroutine { continuation ->
         val tag = "simpleGetUse"
         val okHttpClient = OkHttpClient()
         val requestBuilder = Request.Builder()
-            .url("https://iot-api.heclouds.com/datapoint/history-datapoints?product_id=TRZ54Siy6T&device_name=test_pi")
-            .addHeader("Authorization", "version=2022-05-01&res=products%2FTRZ54Siy6T&et=1725627611&method=sha1&sign=qmCyahbefgl1qGXAjF5x%2BoYzEwQ%3D")
+            .url(apiUrl)
+            .addHeader("Authorization", apiToken)
 
         okHttpClient.newCall(requestBuilder.build()).enqueue(object : Callback {
             @OptIn(UnstableApi::class) override fun onFailure(call: Call, e: IOException) {
@@ -278,10 +306,87 @@ suspend fun simpleGetUse(): String {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@kotlin.OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsDialog(
+    context: Context,
+    scope: CoroutineScope,
+    onDismiss: () -> Unit,
+    onConfirm: (List<String>) -> Unit
+) {
+    var textFieldValue1 by remember { mutableStateOf("") }
+    var textFieldValue2 by remember { mutableStateOf("") }
+    var textFieldValue3 by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "设置")
+        },
+        text = {
+            Column {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            sendNotification2(context = context)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(Color(0xFF997cce)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp)
+                        .width(80.dp)
+                        .height(40.dp)
+                ) {
+                    Text("测试通知", color = Color.White)
+                }
+                OutlinedTextField(
+                    value = textFieldValue1,
+                    onValueChange = { textFieldValue1 = it },
+                    label = { Text("拉流地址") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = textFieldValue2,
+                    onValueChange = { textFieldValue2 = it },
+                    label = { Text("OneNET API链接") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = textFieldValue3,
+                    onValueChange = { textFieldValue3 = it },
+                    label = { Text("API认证token") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onConfirm(listOf(textFieldValue1, textFieldValue2, textFieldValue3))
+                },
+                colors = ButtonDefaults.buttonColors(Color(0xFF997cce))
+            ) {
+                Text("确认")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(Color(0xFF997cce))
+            ) {
+                Text("取消")
+            }
+        },
+        properties = DialogProperties(dismissOnClickOutside = false)
+    )
+}
 
 @Composable
-fun NotificationSwitch() {
-    val context = LocalContext.current
+fun NotificationSwitch(context: Context) {
     var isNotificationEnabled by remember { mutableStateOf(false) }
 
     // 加载开关状态
@@ -316,10 +421,10 @@ fun NotificationSwitch() {
                 }
             },
             colors = SwitchDefaults.colors(
-                checkedTrackColor = Color(0xFF6650A4),
+                checkedTrackColor = Color(0xFF997cce),
                 checkedThumbColor = Color(0xFFFFFFFF),
                 uncheckedTrackColor = Color(0xFFE7E0EC),
-                uncheckedThumbColor = Color(0xFF6650A4)
+                uncheckedThumbColor = Color(0xFF997cce)
             )
         )
         Text("启动通知")
@@ -404,9 +509,10 @@ fun sendNotification(context: Context, title: String, content: String) {
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 suspend fun sendNotification2(context: Context) {
     val remainHeight = withContext(Dispatchers.IO) {
-        simpleGetUse().toInt()
+        simpleGetUse(context).toInt()
     }
     if (remainHeight <= 10) {
-        sendNotification(context, "猫粮剩余量不足！", "猫粮所剩不多！请您及时补充！")
+        val remainPercent = (remainHeight / 30.0 * 100).toInt()
+        sendNotification(context, "猫粮剩余量不足！", "猫粮只剩$remainPercent%！请您及时补充！")
     }
 }
